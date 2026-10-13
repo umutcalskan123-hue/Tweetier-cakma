@@ -8,7 +8,8 @@ const PORT = process.env.PORT || 3000;
 const DB_FILE = path.join(__dirname, 'database.json');
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Database helper functions
 function loadDb() {
@@ -18,16 +19,21 @@ function loadDb() {
       posts: [],
       friendRequests: [],
       friendships: [],
-      messages: []
+      messages: [],
+      groups: [],
+      groupMessages: []
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2));
     return initialData;
   }
   try {
     const data = fs.readFileSync(DB_FILE, 'utf8');
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    if (!parsed.groups) parsed.groups = [];
+    if (!parsed.groupMessages) parsed.groupMessages = [];
+    return parsed;
   } catch (err) {
-    return { users: [], posts: [], friendRequests: [], friendships: [], messages: [] };
+    return { users: [], posts: [], friendRequests: [], friendships: [], messages: [], groups: [], groupMessages: [] };
   }
 }
 
@@ -96,6 +102,26 @@ app.get('/api/users/:userId', (req, res) => {
   res.json(userSafe);
 });
 
+// Update user profile (displayName, bio, avatar)
+app.put('/api/users/:userId', (req, res) => {
+  const { displayName, bio, avatar } = req.body;
+  const db = loadDb();
+  const userIndex = db.users.findIndex(u => u.id === req.params.userId);
+
+  if (userIndex === -1) {
+    return res.status(404).json({ error: 'Kullanıcı bulunamadı.' });
+  }
+
+  if (displayName !== undefined) db.users[userIndex].displayName = displayName;
+  if (bio !== undefined) db.users[userIndex].bio = bio;
+  if (avatar !== undefined) db.users[userIndex].avatar = avatar;
+
+  saveDb(db);
+
+  const { password: _, ...userSafe } = db.users[userIndex];
+  res.json({ message: 'Profil başarıyla güncellendi!', user: userSafe });
+});
+
 // Search users
 app.get('/api/users', (req, res) => {
   const db = loadDb();
@@ -131,9 +157,9 @@ app.get('/api/posts', (req, res) => {
 
 // Create post (tweet)
 app.post('/api/posts', (req, res) => {
-  const { userId, content } = req.body;
-  if (!userId || !content) {
-    return res.status(400).json({ error: 'Kullanıcı ID ve içerik gereklidir.' });
+  const { userId, content, image } = req.body;
+  if (!userId || (!content && !image)) {
+    return res.status(400).json({ error: 'Kullanıcı ID ve içerik veya resim gereklidir.' });
   }
 
   const db = loadDb();
@@ -143,7 +169,8 @@ app.post('/api/posts', (req, res) => {
   const newPost = {
     id: 'post_' + Date.now(),
     userId,
-    content,
+    content: content || '',
+    image: image || null,
     likes: [],
     createdAt: new Date().toISOString()
   };
@@ -286,8 +313,8 @@ app.get('/api/messages/:userId1/:userId2', (req, res) => {
 
 // Send message
 app.post('/api/messages', (req, res) => {
-  const { senderId, receiverId, text } = req.body;
-  if (!senderId || !receiverId || !text) {
+  const { senderId, receiverId, text, image } = req.body;
+  if (!senderId || !receiverId || (!text && !image)) {
     return res.status(400).json({ error: 'Eksik bilgi.' });
   }
 
@@ -296,13 +323,103 @@ app.post('/api/messages', (req, res) => {
     id: 'msg_' + Date.now(),
     senderId,
     receiverId,
-    text,
+    text: text || '',
+    image: image || null,
     createdAt: new Date().toISOString()
   };
 
   db.messages.push(newMessage);
   saveDb(db);
   res.json(newMessage);
+});
+
+// Group Endpoints
+
+// Create group
+app.post('/api/groups', (req, res) => {
+  const { name, avatar, members, createdBy } = req.body; // members is array of userIds
+  if (!name || !createdBy) {
+    return res.status(400).json({ error: 'Grup adı ve oluşturan kullanıcı ID gereklidir.' });
+  }
+
+  const db = loadDb();
+  const allMembers = Array.from(new Set([createdBy, ...(members || [])]));
+
+  const newGroup = {
+    id: 'group_' + Date.now(),
+    name,
+    avatar: avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(name)}`,
+    members: allMembers,
+    createdBy,
+    createdAt: new Date().toISOString()
+  };
+
+  db.groups.push(newGroup);
+  saveDb(db);
+  res.json(newGroup);
+});
+
+// Get user's groups
+app.get('/api/groups/user/:userId', (req, res) => {
+  const db = loadDb();
+  const { userId } = req.params;
+
+  const userGroups = db.groups.filter(g => g.members.includes(userId));
+  res.json(userGroups);
+});
+
+// Get group messages
+app.get('/api/groups/:groupId/messages', (req, res) => {
+  const db = loadDb();
+  const { groupId } = req.params;
+
+  const groupMsgs = (db.groupMessages || [])
+    .filter(m => m.groupId === groupId)
+    .map(m => {
+      const sender = db.users.find(u => u.id === m.senderId);
+      return {
+        ...m,
+        sender: sender ? { id: sender.id, username: sender.username, displayName: sender.displayName, avatar: sender.avatar } : { displayName: 'Bilinmeyen' }
+      };
+    })
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+  res.json(groupMsgs);
+});
+
+// Send message to group
+app.post('/api/groups/:groupId/messages', (req, res) => {
+  const { groupId } = req.params;
+  const { senderId, text, image } = req.body;
+
+  if (!senderId || (!text && !image)) {
+    return res.status(400).json({ error: 'Eksik mesaj bilgisi.' });
+  }
+
+  const db = loadDb();
+  const group = db.groups.find(g => g.id === groupId);
+  if (!group) return res.status(404).json({ error: 'Grup bulunamadı.' });
+
+  const newMessage = {
+    id: 'gmsg_' + Date.now(),
+    groupId,
+    senderId,
+    text: text || '',
+    image: image || null,
+    createdAt: new Date().toISOString()
+  };
+
+  if (!db.groupMessages) db.groupMessages = [];
+  db.groupMessages.push(newMessage);
+  saveDb(db);
+
+  const sender = db.users.find(u => u.id === senderId);
+  const fullMsg = {
+    ...newMessage,
+    sender: sender ? { id: sender.id, username: sender.username, displayName: sender.displayName, avatar: sender.avatar } : { displayName: 'Bilinmeyen' }
+  };
+
+  res.json(fullMsg);
 });
 
 app.listen(PORT, () => {

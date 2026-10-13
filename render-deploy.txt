@@ -37,7 +37,7 @@ BÖLÜM 2: ELECTRON UYGULAMASINI RENDER SUNUCUSUNA BAĞLAMA
 1. Uygulamanızı bilgisayarınızda çalıştırın (`npm start`).
 2. Sağ üst köşedeki **🌐 Sunucu (Server) Ayarı** paneline gidin.
 3. Yerel adres (`http://localhost:3000`) yerine Render'dan aldığınız canlı sunucu adresini yapıştırın (Örn: `https://tweetier-server.onrender.com`).
-4. **Bağlantıyı Güncelle** butonuna tıklayın.
+4. **Bağlantıyı Güncelle** butonuna tıklayın. (İsterseniz doğrudan `src/renderer.js` içindeki `https://ses-servera.onrender.com` adresini kendi Render URL'niz ile değiştirerek de sabitleyebilirsiniz).
 5. Artık dünyanın neresinde olursa olsun bu uygulamayı kullanan herkes aynı Render sunucusuna bağlanarak ortaklaşa mesajlaşabilir ve tweet atabilir!
 
 --------------------------------------------------
