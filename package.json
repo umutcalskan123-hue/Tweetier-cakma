@@ -7,7 +7,25 @@
     "start": "electron .",
     "server": "node server/server.js",
     "dev": "concurrently \"npm run server\" \"electron .\"",
-    "build:win": "electron-builder --win --x64"
+    "build:win": "electron-builder --win --x64",
+    "dist": "electron-builder --win --x64",
+    "build": "electron-builder --win --x64"
+  },
+  "build": {
+    "appId": "com.tweetier.app",
+    "productName": "Tweetier",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "server/**/*",
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    }
   },
   "keywords": [
     "electron",

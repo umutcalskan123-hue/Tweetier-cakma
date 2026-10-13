@@ -1,4 +1,4 @@
-let SERVER_URL = localStorage.getItem('tweetier_server_url') || 'http://localhost:3000';
+let SERVER_URL = localStorage.getItem('tweetier_server_url') || 'https://ses-servera.onrender.com';
 let currentUser = JSON.parse(localStorage.getItem('tweetier_current_user') || 'null');
 let currentTab = 'home';
 let activeChatFriend = null;
