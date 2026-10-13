@@ -1,0 +1,59 @@
+==================================================
+ TWEETIER - RENDER SUNUCU KURULUMU VE .EXE YAPMA REHBERİ
+==================================================
+
+Bu belge, Tweetier uygulamasının backend (sunucu) kısmını Render'a nasıl bağlayacağınızı ve Electron ile masaüstü `.exe` uygulamasını nasıl derleyeceğinizi adım adım açıklar.
+
+--------------------------------------------------
+BÖLÜM 1: BACKEND SUNUCUSUNU RENDER.COM'A YÜKLEME
+--------------------------------------------------
+
+Render.com, Node.js projelerini ücretsiz (veya uygun fiyatlı) olarak barındırmanızı sağlar.
+
+1. **GitHub Deposu Oluşturma:**
+   - Projenizi GitHub'da yeni bir repository (depo) olarak yükleyin.
+   - Dikkat: `server/database.json` dosyası veritabanı olarak kullanılır. Render geçici dosya sistemine sahip olduğu için kalıcı veri saklamak istiyorsanız Render'da bir "Persistent Disk" bağlayabilir veya `server/server.js` dosyasını MongoDB / PostgreSQL gibi bir veritabanına bağlayabilirsiniz. Ancak temel test için mevcut JSON tabanlı sistem de çalışacaktır.
+
+2. **Render'da Yeni Web Service Oluşturma:**
+   - [render.com](https://render.com) adresine giriş yapın.
+   - "New +" butonuna tıklayın ve **Web Service** seçeneğini seçin.
+   - GitHub hesabınızı bağlayın ve Tweetier projenizin deposunu seçin.
+
+3. **Servis Ayarları:**
+   - **Name:** tweetier-server (veya dilediğiniz bir isim)
+   - **Environment:** Node
+   - **Build Command:** `npm install` (veya kök dizinde çalışıyorsanız gerekli bağımlılık yükleme komutu)
+   - **Start Command:** `node server/server.js`
+   - **Instance Type:** Free (Ücretsiz plan)
+
+4. **Deploy (Yayınlama):**
+   - **Create Web Service** butonuna tıklayın.
+   - Render projenizi derleyip yayınlayacaktır. Yayınlandığında size bir URL verecektir (Örn: `https://tweetier-server.onrender.com`).
+
+--------------------------------------------------
+BÖLÜM 2: ELECTRON UYGULAMASINI RENDER SUNUCUSUNA BAĞLAMA
+--------------------------------------------------
+
+1. Uygulamanızı bilgisayarınızda çalıştırın (`npm start`).
+2. Sağ üst köşedeki **🌐 Sunucu (Server) Ayarı** paneline gidin.
+3. Yerel adres (`http://localhost:3000`) yerine Render'dan aldığınız canlı sunucu adresini yapıştırın (Örn: `https://tweetier-server.onrender.com`).
+4. **Bağlantıyı Güncelle** butonuna tıklayın.
+5. Artık dünyanın neresinde olursa olsun bu uygulamayı kullanan herkes aynı Render sunucusuna bağlanarak ortaklaşa mesajlaşabilir ve tweet atabilir!
+
+--------------------------------------------------
+BÖLÜM 3: WINDOWS İÇİN .EXE (MASAÜSTÜ UYGULAMASI) OLUŞTURMA
+--------------------------------------------------
+
+Uygulamanızı tek bir `.exe` yükleyicisine veya paketine dönüştürmek için `electron-builder` kullanabilirsiniz.
+
+1. Terminali (PowerShell veya CMD) projenin ana dizininde açın.
+2. Gerekli paketlerin yüklü olduğundan emin olmak için şunu çalıştırın:
+   ```bash
+   npm install
+   ```
+3. EXE oluşturma komutunu çalıştırın:
+   ```bash
+   npm run build:win
+   ```
+4. İşlem tamamlandığında projenizin içinde **`dist`** adında yeni bir klasör oluşacaktır.
+5. `dist` klasörünün içinde `Tweetier Setup 1.0.0.exe` veya portable `.exe` dosyasını bulabilirsiniz. Bu dosyayı arkadaşlarınızla paylaşabilir, bilgisayarınıza kurup doğrudan kullanabilirsiniz!

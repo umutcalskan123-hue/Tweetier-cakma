@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Tweetier</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Auth Modal -->
+  <div id="auth-modal">
+    <div class="auth-card">
+      <h2>Tweetier</h2>
+      <div class="auth-tabs">
+        <span id="tab-login" class="auth-tab active" onclick="switchAuthTab('login')">Giriş Yap</span>
+        <span id="tab-register" class="auth-tab" onclick="switchAuthTab('register')">Kayıt Ol</span>
+      </div>
+      <form id="auth-form" onsubmit="handleAuth(event)">
+        <div id="register-fields" class="hidden" style="margin-bottom: 15px;">
+          <input type="text" id="reg-display-name" placeholder="Ad Soyad / Görünen İsim" style="margin-bottom: 10px;">
+        </div>
+        <input type="text" id="auth-username" placeholder="Kullanıcı Adı" required style="margin-bottom: 15px;">
+        <input type="password" id="auth-password" placeholder="Şifre" required style="margin-bottom: 20px;">
+        <button type="submit" id="auth-submit-btn" style="width: 100%;">Giriş Yap</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div class="app-container">
+    <!-- Sidebar Navigation -->
+    <sidebar>
+      <div>
+        <div class="logo-area">
+          🐦 Tweetier
+        </div>
+        <div class="nav-links">
+          <div class="nav-item active" onclick="switchTab('home')" id="nav-home">🏠 Ana Sayfa</div>
+          <div class="nav-item" onclick="switchTab('messages')" id="nav-messages">💬 Mesajlar</div>
+          <div class="nav-item" onclick="switchTab('friends')" id="nav-friends">👥 Arkadaşlar</div>
+          <div class="nav-item" onclick="switchTab('profile')" id="nav-profile">👤 Profil</div>
+        </div>
+      </div>
+      <div class="user-profile-badge" id="sidebar-user" style="cursor: pointer;" onclick="switchTab('profile')">
+        <img id="sidebar-avatar" src="" alt="Avatar">
+        <div class="user-info-text">
+          <div class="name" id="sidebar-name">İsim</div>
+          <div class="handle" id="sidebar-handle">@kullanici</div>
+        </div>
+      </div>
+    </sidebar>
+
+    <!-- Main Content -->
+    <main id="main-content-area">
+      <!-- Dynamic Views injected by renderer.js -->
+    </main>
+
+    <!-- Right Widget Panel -->
+    <aside class="right-panel">
+      <div class="widget-box">
+        <div class="widget-title">🌐 Sunucu (Server) Ayarı</div>
+        <p style="font-size: 13px; color: #8899a6; margin-bottom: 10px;">Render veya yerel sunucu adresini girin:</p>
+        <div class="server-config-section">
+          <input type="text" id="server-url-input" value="http://localhost:3000" placeholder="https://senin-serverin.onrender.com">
+          <button class="secondary" onclick="updateServerUrl()" style="width: 100%; margin-top: 5px;">Bağlantıyı Güncelle</button>
+        </div>
+      </div>
+
+      <div class="widget-box">
+        <div class="widget-title">🔍 Kullanıcı Ara</div>
+        <input type="text" id="user-search-input" placeholder="Kullanıcı ara..." oninput="searchUsers(this.value)">
+        <div id="search-results" style="margin-top: 10px; max-height: 200px; overflow-y: auto;"></div>
+      </div>
+    </aside>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

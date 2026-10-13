@@ -1,0 +1,30 @@
+{
+  "name": "tweetier-desktop",
+  "version": "1.0.0",
+  "description": "Tweetier style social and messaging app with Electron and Express",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "server": "node server/server.js",
+    "dev": "concurrently \"npm run server\" \"electron .\"",
+    "build:win": "electron-builder --win --x64"
+  },
+  "keywords": [
+    "electron",
+    "twitter",
+    "tweetier",
+    "chat",
+    "social"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3"
+  }
+}
