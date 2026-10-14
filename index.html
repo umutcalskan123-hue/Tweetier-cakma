@@ -7,10 +7,20 @@
 </head>
 <body class="dark-theme">
 
-  <!-- Auth Modal -->
-  <div id="auth-modal">
+  <!-- Custom Titlebar -->
+  <div class="custom-titlebar">
+    <div class="titlebar-title">TWEETIER</div>
+    <div class="titlebar-controls">
+      <button type="button" class="control-btn minimize" onclick="controlWindow('minimize')" title="Küçült"></button>
+      <button type="button" class="control-btn maximize" onclick="controlWindow('maximize')" title="Büyüt"></button>
+      <button type="button" class="control-btn close" onclick="controlWindow('close')" title="Kapat"></button>
+    </div>
+  </div>
+
+  <!-- Auth Modal (Ortalanmış ve Şık Tasarım) -->
+  <div id="auth-modal" class="auth-overlay">
     <div class="auth-card">
-      <h2>Tweetier</h2>
+      <h2>🐦 Tweetier</h2>
       <div class="auth-tabs">
         <span id="tab-login" class="auth-tab active" onclick="switchAuthTab('login')">Giriş Yap</span>
         <span id="tab-register" class="auth-tab" onclick="switchAuthTab('register')">Kayıt Ol</span>
@@ -29,74 +39,41 @@
   <!-- Edit Profile Modal -->
   <div id="edit-profile-modal" class="modal-overlay hidden">
     <div class="modal-card">
-      <div class="modal-header">
-        <span>Profil Düzenle</span>
-        <button class="icon-btn" onclick="closeEditProfileModal()">✕</button>
+      <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <span style="font-weight:bold; font-size:16px;">Profil Düzenle</span>
+        <button type="button" class="secondary" onclick="closeEditProfileModal()" style="padding:4px 10px;">✕</button>
       </div>
-      <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 10px;">
+      <div style="display: flex; flex-direction: column; gap: 12px;">
         <label style="font-size: 13px; font-weight: bold; color: var(--text-secondary);">Görünen İsim</label>
         <input type="text" id="edit-display-name" placeholder="Ad Soyad">
         
         <label style="font-size: 13px; font-weight: bold; color: var(--text-secondary);">Biyografi</label>
         <textarea id="edit-bio" rows="3" placeholder="Kendinizden bahsedin..."></textarea>
 
-        <label style="font-size: 13px; font-weight: bold; color: var(--text-secondary);">Profil Fotoğrafı</label>
-        <div style="display: flex; gap: 10px; align-items: center;">
-          <input type="text" id="edit-avatar-url" placeholder="Görsel URL veya dosya seçin">
-          <input type="file" id="edit-avatar-file" accept="image/*" style="display: none;" onchange="handleAvatarFileSelect(event)">
-          <button type="button" class="secondary" style="white-space: nowrap;" onclick="document.getElementById('edit-avatar-file').click()">Dosya Seç</button>
-        </div>
-        <div id="edit-avatar-preview" style="text-align: center; margin-top: 5px;">
-          <img id="edit-avatar-img-preview" src="" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover; display: none;">
-        </div>
+        <label style="font-size: 13px; font-weight: bold; color: var(--text-secondary);">Profil Fotoğrafı URL</label>
+        <input type="text" id="edit-avatar-url" placeholder="Görsel URL">
 
-        <button onclick="saveProfileChanges()" style="margin-top: 10px; width: 100%;">Kaydet</button>
+        <button type="button" onclick="saveProfileChanges()" style="margin-top: 10px; width: 100%;">Kaydet</button>
       </div>
     </div>
   </div>
 
-  <!-- Create Group Modal -->
-  <div id="create-group-modal" class="modal-overlay hidden">
-    <div class="modal-card">
-      <div class="modal-header">
-        <span>Yeni Grup Oluştur</span>
-        <button class="icon-btn" onclick="closeCreateGroupModal()">✕</button>
-      </div>
-      <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 10px;">
-        <label style="font-size: 13px; font-weight: bold; color: var(--text-secondary);">Grup Adı</label>
-        <input type="text" id="group-name-input" placeholder="Grup adı girin...">
-
-        <label style="font-size: 13px; font-weight: bold; color: var(--text-secondary);">Üye Ekle (Arkadaşlarım)</label>
-        <div id="group-friends-select-list" style="max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
-          <!-- Populated by JS -->
-        </div>
-
-        <button onclick="submitCreateGroup()" style="margin-top: 10px; width: 100%;">Grubu Oluştur</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Main App -->
+  <!-- Main App Container -->
   <div class="app-container">
-    <!-- Sidebar Navigation -->
     <sidebar>
       <div>
-        <div class="logo-area">
-          🐦 Tweetier
-        </div>
+        <div class="logo-area">🐦 Tweetier</div>
         <div class="nav-links">
           <div class="nav-item active" onclick="switchTab('home')" id="nav-home">🏠 Ana Sayfa</div>
           <div class="nav-item" onclick="switchTab('messages')" id="nav-messages">💬 Mesajlar</div>
           <div class="nav-item" onclick="switchTab('friends')" id="nav-friends">👥 Arkadaşlar</div>
+          <div class="nav-item" onclick="switchTab('bookmarks')" id="nav-bookmarks">🔖 Kaydedilenler</div>
+          <div class="nav-item" onclick="switchTab('settings')" id="nav-settings">⚙️ Ayarlar</div>
           <div class="nav-item" onclick="switchTab('profile')" id="nav-profile">👤 Profil</div>
         </div>
       </div>
 
       <div>
-        <button class="theme-toggle-btn" onclick="toggleTheme()" id="theme-toggle-btn" style="width: 100%;">
-          🌙 Koyu Tema
-        </button>
-
         <div class="user-profile-badge" id="sidebar-user" style="cursor: pointer;" onclick="switchTab('profile')">
           <img id="sidebar-avatar" src="" alt="Avatar">
           <div class="user-info-text">
@@ -107,21 +84,46 @@
       </div>
     </sidebar>
 
-    <!-- Main Content -->
     <main id="main-content-area">
-      <!-- Dynamic Views injected by renderer.js -->
     </main>
 
-    <!-- Right Widget Panel -->
+    <!-- Sağ Panel -->
     <aside class="right-panel">
       <div class="widget-box">
-        <div class="widget-title">🔍 Kullanıcı Ara</div>
+        <div class="widget-title">🔍 Arama & Keşfet</div>
         <input type="text" id="user-search-input" placeholder="Kullanıcı ara..." oninput="searchUsers(this.value)">
-        <div id="search-results" style="margin-top: 10px; max-height: 250px; overflow-y: auto;"></div>
+        <div id="search-results" style="margin-top: 10px; max-height: 180px; overflow-y: auto;"></div>
+      </div>
+
+      <div class="widget-box">
+        <div class="widget-title">📰 Gündem & Haberler</div>
+        <div id="news-container" style="font-size: 13px; display: flex; flex-direction: column; gap: 10px; color: var(--text-secondary);">
+          <div class="news-item" style="cursor:pointer;" onclick="window.open('https://news.google.com')">🔥 Teknoloji dünyasında yapay zeka yarışları hız kesmiyor...</div>
+          <div class="news-item" style="cursor:pointer;" onclick="window.open('https://news.google.com')">🚀 Yeni nesil masaüstü uygulamaları Electron ile zirvede.</div>
+          <div class="news-item" style="cursor:pointer;" onclick="window.open('https://news.google.com')">⚡ Yazılım geliştiriciler için popüler trend framework güncellemeleri.</div>
+        </div>
+      </div>
+
+      <div class="widget-box">
+        <div class="widget-title">🔔 Bildirimler</div>
+        <div id="notifications-list" style="font-size: 13px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 8px;">
+          <div>👋 Tweetier'e hoş geldin!</div>
+        </div>
       </div>
     </aside>
   </div>
 
+  <!-- Pencere Kontrol Scripti -->
+  <script>
+    function controlWindow(action) {
+      try {
+        const { ipcRenderer } = require('electron');
+        ipcRenderer.send('window-control', action);
+      } catch (e) {
+        console.error("IPC Error:", e);
+      }
+    }
+  </script>
   <script src="renderer.js"></script>
 </body>
 </html>

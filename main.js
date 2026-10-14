@@ -1,41 +1,57 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 
-// Start embedded Express server
+// Embedded Express sunucusunu başlat
 require('./server/server.js');
 
 let mainWindow;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 1280,
+    height: 850,
+    minWidth: 900,
+    minHeight: 600,
+    frame: false,
+    titleBarStyle: 'hidden',
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false
+      contextIsolation: false,
+      enableRemoteModule: true
     },
-    title: 'Tweetier - Sosyal Ağ ve Mesajlaşma',
-    backgroundColor: '#15202b'
+    title: 'Tweetier',
+    backgroundColor: '#0b0e14'
   });
 
   mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'));
-
-  // Uncomment to open DevTools during debugging
-  // mainWindow.webContents.openDevTools();
 }
+
+// Pencere Kontrolleri (Kesin Çözüm)
+ipcMain.on('window-control', (event, action) => {
+  const win = BrowserWindow.getFocusedWindow() || mainWindow;
+  if (!win) return;
+  
+  if (action === 'minimize') {
+    win.minimize();
+  } else if (action === 'maximize') {
+    if (win.isMaximized()) {
+      win.unmaximize();
+    } else {
+      win.maximize();
+    }
+  } else if (action === 'close') {
+    win.close();
+  }
+});
 
 app.whenReady().then(() => {
   createWindow();
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  if (process.platform !== 'darwin') app.quit();
 });
