@@ -40,9 +40,9 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "better-sqlite3": "^13.0.3",
     "cors": "^2.8.5",
     "express": "^4.19.2",
+    "pg": "^8.23.1",
     "socket.io": "^4.8.4"
   },
   "devDependencies": {
