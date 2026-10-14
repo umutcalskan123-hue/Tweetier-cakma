@@ -59,23 +59,15 @@ function addNotification(userId, text) {
   }
 }
 
-function getUserSocketId(userId) {
-  if (usePostgres) {
-    const row = await pg.query('SELECT socketId FROM users WHERE id = $1', [userId]);
-    return row.rows[0] ? row.rows[0].socketid : null;
-  }
-  const data = loadData();
-  const user = data.users.find(u => u.id === userId);
-  return user ? user.socketId || null : null;
-}
-
 function emitToUser(userId, event, data) {
   if (usePostgres) {
     pg.query('SELECT socketId FROM users WHERE id = $1', [userId]).then(r => {
       if (r.rows[0] && r.rows[0].socketid) io.to(r.rows[0].socketid).emit(event, data);
     });
   } else {
-    const socketId = getUserSocketId(userId);
+    const data = loadData();
+    const user = data.users.find(u => u.id === userId);
+    const socketId = user ? user.socketId || null : null;
     if (socketId) io.to(socketId).emit(event, data);
   }
 }
