@@ -22,10 +22,12 @@
       "server/**/*",
       "src/**/*",
       "package.json",
-      "config.json"
+      "config.json",
+      "build/icon.ico"
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "build/icon.ico"
     }
   },
   "keywords": [
@@ -40,7 +42,6 @@
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.19.2",
-    "socket.io": "^4.7.5",
     "socket.io": "^4.8.4"
   },
   "devDependencies": {

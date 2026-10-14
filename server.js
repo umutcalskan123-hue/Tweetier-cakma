@@ -11,7 +11,7 @@ const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] }
 });
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
@@ -110,7 +110,7 @@ app.post('/api/login', (req, res) => {
   res.json(userWithoutPass);
 });
 
-// Users & Friends & Block
+// Users
 app.get('/api/users', (req, res) => {
   const data = loadData();
   const users = data.users.map(({ password, socketId, ...u }) => u);
@@ -271,24 +271,7 @@ app.post('/api/friend-requests/:requestId/reject', (req, res) => {
   res.json({ success: true });
 });
 
-app.get('/api/friend-requests/sent/:userId', (req, res) => {
-  const { userId } = req.params;
-  const data = loadData();
-  const requests = (data.friendRequests || []).filter(
-    r => r.senderId === userId && r.status === 'pending'
-  );
-  const enriched = requests.map(r => {
-    const receiver = data.users.find(u => u.id === r.receiverId);
-    return {
-      ...r,
-      receiverName: receiver ? receiver.displayName : 'Bilinmeyen',
-      receiverAvatar: receiver ? receiver.avatar : ''
-    };
-  });
-  res.json(enriched);
-});
-
-// Tweets, Comments & Delete
+// Tweets
 app.get('/api/tweets', (req, res) => {
   const data = loadData();
   res.json(data.tweets.sort((a, b) => b.timestamp - a.timestamp));
@@ -409,7 +392,7 @@ app.post('/api/bookmarks', (req, res) => {
   res.json({ success: true });
 });
 
-// Messages & Delete & Seen
+// Messages
 app.get('/api/messages', (req, res) => {
   const data = loadData();
   res.json(data.messages);
