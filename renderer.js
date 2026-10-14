@@ -1,4 +1,5 @@
 let API_URL = 'http://localhost:3000/api';
+let socket = null;
 
 async function loadConfig() {
   try {
@@ -18,9 +19,10 @@ let currentUser = null;
 let currentTab = 'home';
 let currentChatUser = null;
 let homeSubTab = 'suggested';
-let friendsSubTab = 'following'; // 'following' (Arkadaşlarım) veya 'explore' (Keşfet)
+let friendsSubTab = 'following';
 let currentLanguage = 'tr';
 let lastNotificationCount = 0;
+let unreadFriendRequests = 0;
 
 const translations = {
   tr: {
@@ -42,7 +44,12 @@ const translations = {
     save: "Kaydet",
     chats: "Sohbetler",
     typeMsg: "Mesaj yaz...",
-    send: "Gönder"
+    send: "Gönder",
+    friendRequests: "Arkadaşlık İstekleri",
+    accept: "Kabul Et",
+    reject: "Reddet",
+    noFriendRequests: "Bekleyen istek yok",
+    sendRequest: "İstek Gönder"
   },
   en: {
     home: "Home",
@@ -63,7 +70,12 @@ const translations = {
     save: "Save",
     chats: "Chats",
     typeMsg: "Type a message...",
-    send: "Send"
+    send: "Send",
+    friendRequests: "Friend Requests",
+    accept: "Accept",
+    reject: "Reject",
+    noFriendRequests: "No pending requests",
+    sendRequest: "Send Request"
   }
 };
 
@@ -85,6 +97,133 @@ function playNotificationSound() {
     osc.stop(audioCtx.currentTime + 0.15);
   } catch (e) {
     console.error("Audio error:", e);
+  }
+}
+
+function connectSocket() {
+  if (socket) return;
+  const serverBase = API_URL.replace('/api', '');
+  socket = io(serverBase);
+
+  socket.on('connect', () => {
+    if (currentUser) {
+      socket.emit('register-socket', currentUser.id);
+    }
+  });
+
+  socket.on('new-message', (msg) => {
+    if (currentChatUser && msg.senderId === currentChatUser.id) {
+      appendMessageToChat(msg);
+      markMessagesSeen(currentChatUser.id);
+    }
+    if (msg.receiverId === currentUser.id) {
+      playNotificationSound();
+      loadChatUsers();
+    }
+  });
+
+  socket.on('new-tweet', (tweet) => {
+    if (currentTab === 'home') {
+      loadTweets();
+    }
+  });
+
+  socket.on('friend-request', (data) => {
+    unreadFriendRequests++;
+    updateFriendRequestBadge();
+    playNotificationSound();
+    loadFriendRequests();
+  });
+
+  socket.on('friend-request-accepted', (data) => {
+    playNotificationSound();
+    if (currentTab === 'friends') {
+      renderFriendsUI(document.getElementById('main-content-area'));
+    }
+    loadChatUsers();
+  });
+
+  socket.on('friend-added', (data) => {
+    if (currentTab === 'friends') {
+      renderFriendsUI(document.getElementById('main-content-area'));
+    }
+  });
+}
+
+function updateFriendRequestBadge() {
+  const badge = document.getElementById('friend-request-badge');
+  if (badge) {
+    if (unreadFriendRequests > 0) {
+      badge.style.display = 'flex';
+      badge.innerText = unreadFriendRequests;
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+}
+
+async function loadFriendRequests() {
+  if (!currentUser) return;
+  try {
+    const res = await fetch(`${API_URL}/friend-requests/${currentUser.id}`);
+    const requests = await res.json();
+    const container = document.getElementById('friend-requests-list');
+    if (!container) return;
+
+    if (requests.length === 0) {
+      container.innerHTML = `<div style="padding:10px; color:var(--text-secondary); font-size:13px;">${t('noFriendRequests')}</div>`;
+      return;
+    }
+
+    container.innerHTML = requests.map(r => `
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:8px; background:var(--bg-card); border-radius:8px; margin-top:5px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <img src="${r.senderAvatar || ''}" style="width:30px;height:30px;border-radius:50%;">
+          <span>${r.senderName}</span>
+        </div>
+        <div style="display:flex; gap:5px;">
+          <button onclick="acceptFriendRequest('${r.id}')" style="padding:4px 8px; font-size:11px; background:#1d9bf0; color:white; border:none; border-radius:4px; cursor:pointer;">${t('accept')}</button>
+          <button onclick="rejectFriendRequest('${r.id}')" style="padding:4px 8px; font-size:11px; background:transparent; color:#ff5f56; border:1px solid #ff5f56; border-radius:4px; cursor:pointer;">${t('reject')}</button>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+async function acceptFriendRequest(requestId) {
+  await fetch(`${API_URL}/friend-requests/${requestId}/accept`, { method: 'POST' });
+  unreadFriendRequests = Math.max(0, unreadFriendRequests - 1);
+  updateFriendRequestBadge();
+  loadFriendRequests();
+  loadChatUsers();
+  if (currentTab === 'friends') renderFriendsUI(document.getElementById('main-content-area'));
+}
+
+async function rejectFriendRequest(requestId) {
+  await fetch(`${API_URL}/friend-requests/${requestId}/reject`, { method: 'POST' });
+  unreadFriendRequests = Math.max(0, unreadFriendRequests - 1);
+  updateFriendRequestBadge();
+  loadFriendRequests();
+}
+
+async function sendFriendRequest(userId) {
+  if (!currentUser) return;
+  try {
+    const res = await fetch(`${API_URL}/friend-requests`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ senderId: currentUser.id, receiverId: userId })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error);
+    } else {
+      alert(t('sendRequest') + ' ✓');
+    }
+  } catch (e) {
+    console.error(e);
   }
 }
 
@@ -135,10 +274,14 @@ async function handleAuth(event) {
     if (!res.ok) throw new Error(data.error);
 
     currentUser = data;
+    connectSocket();
+    if (socket) socket.emit('register-socket', currentUser.id);
+
     document.getElementById('auth-modal').style.display = 'none';
     updateSidebarUser();
     switchTab('home');
     loadNotifications();
+    loadFriendRequests();
   } catch (err) {
     alert(err.message);
   }
@@ -203,6 +346,8 @@ function renderMainContent() {
     renderSettingsUI(mainArea);
   } else if (currentTab === 'profile') {
     renderProfileUI(mainArea);
+  } else if (currentTab === 'friend-requests') {
+    renderFriendRequestsUI(mainArea);
   }
 }
 
@@ -211,13 +356,23 @@ function setHomeSubTab(sub) {
   renderMainContent();
 }
 
+function renderFriendRequestsUI(mainArea) {
+  mainArea.innerHTML = `
+    <div class="header-title">${t('friendRequests')}</div>
+    <div id="friend-requests-list" style="padding:24px;"></div>
+  `;
+  unreadFriendRequests = 0;
+  updateFriendRequestBadge();
+  loadFriendRequests();
+}
+
 async function loadTweets() {
   const feed = document.getElementById('tweets-feed');
   if (!feed) return;
   try {
     const res = await fetch(`${API_URL}/tweets`);
     const tweets = await res.json();
-    
+
     const blockRes = await fetch(`${API_URL}/blocks/${currentUser.id}`);
     const blockedUsers = await blockRes.json();
 
@@ -393,13 +548,14 @@ function changeLanguage(lang) {
   document.getElementById('nav-bookmarks').innerText = `🔖 ${t('bookmarks')}`;
   document.getElementById('nav-settings').innerText = `⚙️ ${t('settings')}`;
   document.getElementById('nav-profile').innerText = `👤 ${t('profile')}`;
+  document.getElementById('nav-friend-requests').innerText = `🤝 ${t('friendRequests')}`;
   renderMainContent();
 }
 
 async function searchUsers(query) {
   const resultsDiv = document.getElementById('search-results');
   if (!query.trim()) { resultsDiv.innerHTML = ''; return; }
-  
+
   const res = await fetch(`${API_URL}/users`);
   const users = await res.json();
   const filtered = users.filter(u => u.username.toLowerCase().includes(query.toLowerCase()) && u.id !== currentUser.id);
@@ -410,7 +566,7 @@ async function searchUsers(query) {
         <img src="${u.avatar}" style="width:30px;height:30px;border-radius:50%;">
         <span>${u.displayName}</span>
       </div>
-      <button onclick="followUser('${u.id}')" style="padding:4px 10px; font-size:12px;">Ekle</button>
+      <button onclick="sendFriendRequest('${u.id}')" style="padding:4px 10px; font-size:12px;">${t('sendRequest')}</button>
     </div>
   `).join('');
 }
@@ -436,7 +592,6 @@ async function blockUser(id) {
   if (currentTab === 'friends') renderFriendsUI(document.getElementById('main-content-area'));
 }
 
-// Arkadaşlar Sekmesi (Solda "Arkadaşlarım", Sağda "Keşfet")
 function renderFriendsUI(mainArea) {
   mainArea.innerHTML = `
     <div class="header-title">${t('friends')}</div>
@@ -477,8 +632,8 @@ async function loadFriendsContent(query) {
   if (friendsSubTab === 'following') {
     filtered = filtered.filter(u => followingList.includes(u.id));
   } else if (friendsSubTab === 'explore' && query.trim()) {
-    filtered = filtered.filter(u => 
-      u.username.toLowerCase().includes(query.toLowerCase()) || 
+    filtered = filtered.filter(u =>
+      u.username.toLowerCase().includes(query.toLowerCase()) ||
       (u.displayName && u.displayName.toLowerCase().includes(query.toLowerCase()))
     );
   }
@@ -501,7 +656,7 @@ async function loadFriendsContent(query) {
             <div style="font-size:12px; color:var(--text-secondary);">@${u.username}</div>
           </div>
         </div>
-        <div style="display:flex; gap:8px;">
+        <div style="display:flex; gap:8px">
           <button onclick="followUser('${u.id}')" class="${isFollowing ? 'secondary' : ''}">
             ${isFollowing ? 'Arkadaşsın' : 'Arkadaş Ekle'}
           </button>
@@ -512,7 +667,6 @@ async function loadFriendsContent(query) {
   }).join('');
 }
 
-// Profil Ekranı (Kesin Düzeltildi)
 function renderProfileUI(mainArea) {
   if (!currentUser) return;
 
@@ -551,7 +705,7 @@ function openEditProfileModal() {
       <div style="display: flex; flex-direction: column; gap: 12px;">
         <label style="font-size: 13px; font-weight: bold; color: var(--text-secondary);">Görünen İsim</label>
         <input type="text" id="edit-display-name" value="${currentUser.displayName || currentUser.username || ''}">
-        
+
         <label style="font-size: 13px; font-weight: bold; color: var(--text-secondary);">Biyografi</label>
         <textarea id="edit-bio" rows="3">${currentUser.bio || ''}</textarea>
 
@@ -590,7 +744,6 @@ async function saveProfileChanges() {
   renderMainContent();
 }
 
-// Mesajlar (Sadece Arkadaşlar Listesi)
 function renderMessagesUI(mainArea) {
   mainArea.innerHTML = `
     <div class="chat-container">
@@ -616,6 +769,7 @@ async function loadChatUsers() {
   const res = await fetch(`${API_URL}/users`);
   const users = await res.json();
   const list = document.getElementById('chat-users-list');
+  if (!list) return;
 
   const followingList = currentUser.following || [];
   const friendUsers = users.filter(u => followingList.includes(u.id));
@@ -635,8 +789,10 @@ async function loadChatUsers() {
 
 async function selectChatUser(id, name, avatar) {
   currentChatUser = { id, name, avatar };
-  document.getElementById('chat-header').innerText = `${name} ile Sohbet`;
-  document.getElementById('chat-input-box').style.display = 'flex';
+  const headerEl = document.getElementById('chat-header');
+  const inputEl = document.getElementById('chat-input-box');
+  if (headerEl) headerEl.innerText = `${name} ile Sohbet`;
+  if (inputEl) inputEl.style.display = 'flex';
 
   await fetch(`${API_URL}/messages/seen`, {
     method: 'POST',
@@ -652,8 +808,9 @@ async function loadMessages() {
   const res = await fetch(`${API_URL}/messages`);
   const messages = await res.json();
   const container = document.getElementById('chat-messages');
+  if (!container) return;
 
-  const filtered = messages.filter(m => 
+  const filtered = messages.filter(m =>
     (m.senderId === currentUser.id && m.receiverId === currentChatUser.id) ||
     (m.senderId === currentChatUser.id && m.receiverId === currentUser.id)
   );
@@ -671,6 +828,34 @@ async function loadMessages() {
     `;
   }).join('');
   container.scrollTop = container.scrollHeight;
+}
+
+function appendMessageToChat(msg) {
+  const container = document.getElementById('chat-messages');
+  if (!container || !currentChatUser) return;
+  if (msg.senderId !== currentChatUser.id && msg.receiverId !== currentUser.id) return;
+
+  const isSent = msg.senderId === currentUser.id;
+  const html = `
+    <div class="message-bubble ${isSent ? 'sent' : 'received'}" style="position:relative; padding-bottom:20px;">
+      <div>${msg.content}</div>
+      <div style="font-size:10px; text-align:right; opacity:0.7; margin-top:4px; display:flex; justify-content:space-between; align-items:center;">
+        ${isSent ? `<button onclick="deleteMessage('${msg.id}')" style="background:transparent; border:none; color:#ff5f56; font-size:10px; cursor:pointer;">Sil</button>` : '<span></span>'}
+        <span>${isSent ? (msg.seen ? 'Görüldü ✓✓' : 'İletildi ✓') : ''}</span>
+      </div>
+    </div>
+  `;
+  container.insertAdjacentHTML('beforeend', html);
+  container.scrollTop = container.scrollHeight;
+}
+
+function markMessagesSeen(partnerId) {
+  if (!currentUser || !partnerId) return;
+  fetch(`${API_URL}/messages/seen`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId: currentUser.id, partnerId })
+  });
 }
 
 async function deleteMessage(msgId) {
@@ -696,7 +881,6 @@ async function sendMessage() {
   loadMessages();
 }
 
-// Canlı Bildirimler
 async function loadNotifications() {
   if (!currentUser) return;
   try {

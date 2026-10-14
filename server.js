@@ -2,8 +2,15 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
+const { Server } = require('socket.io');
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: '*', methods: ['GET', 'POST'] }
+});
+
 const PORT = 3000;
 
 app.use(cors());
@@ -18,8 +25,9 @@ function loadData() {
       tweets: [],
       messages: [],
       bookmarks: {},
-      blocks: [], // ["userId_blockedUserId"]
-      notifications: {}
+      blocks: [],
+      notifications: {},
+      friendRequests: []
     };
     fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2));
     return initialData;
@@ -27,7 +35,7 @@ function loadData() {
   try {
     return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
   } catch (e) {
-    return { users: [], tweets: [], messages: [], bookmarks: [], blocks: [], notifications: {} };
+    return { users: [], tweets: [], messages: [], bookmarks: [], blocks: [], notifications: {}, friendRequests: [] };
   }
 }
 
@@ -45,6 +53,19 @@ function addNotification(userId, text) {
     timestamp: Date.now()
   });
   saveData(data);
+}
+
+function getUserSocketId(userId) {
+  const data = loadData();
+  const user = data.users.find(u => u.id === userId);
+  return user ? user.socketId || null : null;
+}
+
+function emitToUser(userId, event, data) {
+  const socketId = getUserSocketId(userId);
+  if (socketId) {
+    io.to(socketId).emit(event, data);
+  }
 }
 
 const birdAvatars = [
@@ -69,7 +90,8 @@ app.post('/api/register', (req, res) => {
     displayName: displayName || username,
     bio: 'Tweetier kuşu 🐦',
     avatar: randomAvatar,
-    following: []
+    following: [],
+    socketId: null
   };
   data.users.push(newUser);
   saveData(data);
@@ -91,7 +113,7 @@ app.post('/api/login', (req, res) => {
 // Users & Friends & Block
 app.get('/api/users', (req, res) => {
   const data = loadData();
-  const users = data.users.map(({ password, ...u }) => u);
+  const users = data.users.map(({ password, socketId, ...u }) => u);
   res.json(users);
 });
 
@@ -125,6 +147,7 @@ app.post('/api/users/:id/follow', (req, res) => {
   } else {
     currentUser.following.push(id);
     addNotification(id, `${currentUser.displayName} seni arkadaş olarak ekledi! 👥`);
+    emitToUser(id, 'friend-added', { userId: currentUserId, displayName: currentUser.displayName });
   }
   saveData(data);
   const { password: _, ...userWithoutPass } = currentUser;
@@ -153,6 +176,116 @@ app.get('/api/blocks/:userId', (req, res) => {
   const data = loadData();
   const userBlocks = (data.blocks || []).filter(b => b.startsWith(`${userId}_`)).map(b => b.split('_')[1]);
   res.json(userBlocks);
+});
+
+// Friend Requests
+app.post('/api/friend-requests', (req, res) => {
+  const { senderId, receiverId } = req.body;
+  const data = loadData();
+  if (!data.friendRequests) data.friendRequests = [];
+
+  const existing = data.friendRequests.find(
+    r => r.senderId === senderId && r.receiverId === receiverId && r.status === 'pending'
+  );
+  if (existing) return res.status(400).json({ error: 'İstek zaten gönderilmiş.' });
+
+  const sender = data.users.find(u => u.id === senderId);
+  if (!sender) return res.status(404).json({ error: 'Kullanıcı bulunamadı.' });
+
+  const request = {
+    id: Date.now().toString(),
+    senderId,
+    receiverId,
+    status: 'pending',
+    timestamp: Date.now()
+  };
+  data.friendRequests.push(request);
+  saveData(data);
+
+  addNotification(receiverId, `${sender.displayName} sana arkadaşlık isteği gönderdi! 🤝`);
+  emitToUser(receiverId, 'friend-request', {
+    requestId: request.id,
+    senderId,
+    senderName: sender.displayName,
+    senderAvatar: sender.avatar
+  });
+
+  res.json(request);
+});
+
+app.get('/api/friend-requests/:userId', (req, res) => {
+  const { userId } = req.params;
+  const data = loadData();
+  const requests = (data.friendRequests || []).filter(
+    r => r.receiverId === userId && r.status === 'pending'
+  );
+  const enriched = requests.map(r => {
+    const sender = data.users.find(u => u.id === r.senderId);
+    return {
+      ...r,
+      senderName: sender ? sender.displayName : 'Bilinmeyen',
+      senderUsername: sender ? sender.username : '',
+      senderAvatar: sender ? sender.avatar : ''
+    };
+  });
+  res.json(enriched);
+});
+
+app.post('/api/friend-requests/:requestId/accept', (req, res) => {
+  const { requestId } = req.params;
+  const data = loadData();
+  const request = data.friendRequests.find(r => r.id === requestId);
+  if (!request) return res.status(404).json({ error: 'İstek bulunamadı.' });
+
+  request.status = 'accepted';
+
+  const sender = data.users.find(u => u.id === request.senderId);
+  const receiver = data.users.find(u => u.id === request.receiverId);
+
+  if (sender && receiver) {
+    if (!sender.following) sender.following = [];
+    if (!receiver.following) receiver.following = [];
+    if (!sender.following.includes(receiver.id)) sender.following.push(receiver.id);
+    if (!receiver.following.includes(sender.id)) receiver.following.push(sender.id);
+
+    addNotification(request.senderId, `${receiver.displayName} arkadaşlık isteğini kabul etti! 🎉`);
+    emitToUser(request.senderId, 'friend-request-accepted', {
+      userId: receiver.id,
+      displayName: receiver.displayName,
+      avatar: receiver.avatar
+    });
+  }
+
+  saveData(data);
+  res.json({ success: true });
+});
+
+app.post('/api/friend-requests/:requestId/reject', (req, res) => {
+  const { requestId } = req.params;
+  const data = loadData();
+  const request = data.friendRequests.find(r => r.id === requestId);
+  if (!request) return res.status(404).json({ error: 'İstek bulunamadı.' });
+
+  request.status = 'rejected';
+  saveData(data);
+  res.json({ success: true });
+});
+
+app.get('/api/friend-requests/sent/:userId', (req, res) => {
+  const { userId } = req.params;
+  const data = loadData();
+  const requests = (data.friendRequests || []).filter(
+    r => r.senderId === userId && r.status === 'pending'
+  );
+  const enriched = requests.map(r => {
+    const receiver = data.users.find(u => u.id === r.receiverId);
+    return {
+      ...r,
+      receiverName: receiver ? receiver.displayName : 'Bilinmeyen',
+      receiverAvatar: receiver ? receiver.avatar : ''
+    };
+  });
+  res.json(enriched);
 });
 
 // Tweets, Comments & Delete
@@ -185,6 +318,7 @@ app.post('/api/tweets', (req, res) => {
   data.users.forEach(u => {
     if (u.following && u.following.includes(userId)) {
       addNotification(u.id, `${user.displayName} yeni bir tweet paylaştı! 🐦`);
+      emitToUser(u.id, 'new-tweet', newTweet);
     }
   });
 
@@ -299,6 +433,11 @@ app.post('/api/messages', (req, res) => {
 
   if (sender) {
     addNotification(receiverId, `${sender.displayName} sana yeni bir mesaj gönderdi 💬`);
+    emitToUser(receiverId, 'new-message', {
+      ...newMsg,
+      senderName: sender.displayName,
+      senderAvatar: sender.avatar
+    });
   }
   res.json(newMsg);
 });
@@ -333,6 +472,38 @@ app.get('/api/notifications/:userId', (req, res) => {
   res.json(data.notifications[userId] || []);
 });
 
-app.listen(PORT, () => {
+// Socket.io
+const userSockets = {};
+
+io.on('connection', (socket) => {
+  console.log('Kullanıcı bağlandı:', socket.id);
+
+  socket.on('register-socket', (userId) => {
+    userSockets[userId] = socket.id;
+    const data = loadData();
+    const user = data.users.find(u => u.id === userId);
+    if (user) {
+      user.socketId = socket.id;
+      saveData(data);
+    }
+    console.log(`Socket kaydedildi: ${userId} -> ${socket.id}`);
+  });
+
+  socket.on('disconnect', () => {
+    const userId = Object.keys(userSockets).find(k => userSockets[k] === socket.id);
+    if (userId) {
+      delete userSockets[userId];
+      const data = loadData();
+      const user = data.users.find(u => u.id === userId);
+      if (user) {
+        user.socketId = null;
+        saveData(data);
+      }
+    }
+    console.log('Kullanıcı ayrıldı:', socket.id);
+  });
+});
+
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

@@ -67,6 +67,10 @@
           <div class="nav-item active" onclick="switchTab('home')" id="nav-home">🏠 Ana Sayfa</div>
           <div class="nav-item" onclick="switchTab('messages')" id="nav-messages">💬 Mesajlar</div>
           <div class="nav-item" onclick="switchTab('friends')" id="nav-friends">👥 Arkadaşlar</div>
+          <div class="nav-item" onclick="switchTab('friend-requests')" id="nav-friend-requests" style="position:relative;">
+            🤝 Arkadaşlık İstekleri
+            <span id="friend-request-badge" style="display:none; position:absolute; top:2px; right:2px; background:#ff5f56; color:white; font-size:10px; width:16px; height:16px; border-radius:50%; align-items:center; justify-content:center;"></span>
+          </div>
           <div class="nav-item" onclick="switchTab('bookmarks')" id="nav-bookmarks">🔖 Kaydedilenler</div>
           <div class="nav-item" onclick="switchTab('settings')" id="nav-settings">⚙️ Ayarlar</div>
           <div class="nav-item" onclick="switchTab('profile')" id="nav-profile">👤 Profil</div>
@@ -124,6 +128,7 @@
       }
     }
   </script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>
